@@ -24,6 +24,16 @@ class LoginAction
     protected $response;
 
     /**
+     * Constructor
+     *
+     * @param \Slim\Container $app
+     */
+    public function __construct(Container $app)
+    {
+        $this->app = $app;
+    }
+
+    /**
      * @param Request $request
      * @param Response $response
      * @return Response
