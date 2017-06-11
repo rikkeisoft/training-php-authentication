@@ -9,7 +9,7 @@ use Slim\Container;
 
 class LoginAction
 {
-    const MAX_TRY_TIME = 5;
+    const MAX_LOGIN_ATTEMPTS = 5;
 
     /**
      * @var Container
@@ -58,8 +58,8 @@ class LoginAction
         }
 
         // check too many tries
-        if ($this->hasTooManyTries()) {
-            $this->showFlashMessage('Too muany tries');
+        if ($this->hasTooManyLoginAttempts()) {
+            $this->showFlashMessage('Too many login attempts. Please try again after a few minutes');
 
             return $this->redirectTo('/login');
         }
@@ -74,7 +74,7 @@ class LoginAction
         // check username and password format
         if (!$this->checkUsernameFormat($request['username']) || !$this->checkPasswordFormat($request['password'])) {
             $this->showFlashMessage('Username or password is invalid format');
-            $this->increasedTryTime();
+            $this->incrementLoginAttempts();
 
             return $this->redirectTo('/login');
         }
@@ -83,12 +83,12 @@ class LoginAction
         $user = $this->getUserByUsername($request['username']);
         if (empty($user) || !Hasher::match($request['password'], $user['password'])) {
             $this->showFlashMessage('User or Password incorrect');
-            $this->increasedTryTime();
+            $this->incrementLoginAttempts();
 
             return $this->redirectTo('/login');
         }
 
-        $this->clearTryTime();
+        $this->clearLoginAttempts();
 
         // check user state
         if (!$this->checkUserState($user['state'])) {
@@ -138,7 +138,7 @@ class LoginAction
      */
     protected function checkUsernameFormat($username)
     {
-        return preg_match('/\w{3,20}/') > 0;
+        return preg_match('/\w{3,20}/', $username) > 0;
     }
 
     /**
@@ -147,36 +147,43 @@ class LoginAction
      */
     protected function checkPasswordFormat($password)
     {
-        return preg_match('/[a-z0-9]{3,20}/') > 0;
+        return preg_match('/[a-z0-9]{3,20}/', $password) > 0;
     }
 
     /**
      * @return bool
      */
-    protected function hasTooManyTries()
+    protected function hasTooManyLoginAttempts()
     {
-        if (isset($_SESSION['try_time']) && $_SESSION['try_time'] > static::MAX_TRY_TIME) {
-            $this->saveCookie('try_time', '1', 15 * 60);
-            unset($_SESSION['try_time']);
+        if (isset($_COOKIE['login_attempts'])) {
+            return true;
         }
 
-        return isset($_COOKIE['try_time']);
+        if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] > static::MAX_LOGIN_ATTEMPTS) {
+            $this->saveCookie('login_attempts', 1, 15 * 60);
+            $_SESSION['login_attempts'] = 0;
+
+            return true
+        }
+
+        return false;
     }
 
     /**
      * @return void
      */
-    protected function increasedTryTime()
+    protected function incrementLoginAttempts()
     {
-        $_SESSION['try_time'] = isset($_SESSION['try_time']) ? ($_SESSION['try_time'] + 1) : 1;
+        $_SESSION['login_attempts'] = isset($_SESSION['login_attempts']) ? ($_SESSION['login_attempts'] + 1) : 1;
     }
 
     /**
      * @return void
      */
-    protected function clearTryTime()
+    protected function clearLoginAttempts()
     {
-        unset($_SESSION['try_time'], $_COOKIE['try_time']);
+        unset($_SESSION['login_attempts'], $_COOKIE['login_attempts']);
+        $this->saveCookie('login_attempts', null, -1);
     }
 
     /**
